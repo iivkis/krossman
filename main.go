@@ -1,3 +1,7 @@
+//! KROSSMAN (version 0.2)
+//@ Author ivkis (t.me/iivkis)
+//# Support Shop(-s): Nike.
+
 package main
 
 import (
@@ -9,8 +13,10 @@ import (
 
 const addr = "localhost:8027"
 
-//http://export.admitad.com/ru/webmaster/websites/213277/products/export_adv_products/?user=millstone&code=56d7cfafe9&feed_id=18062&format=xml
-
+/*
+	---Shop links---
+	Nike: http://export.admitad.com/ru/webmaster/websites/213277/products/export_adv_products/?user=millstone&code=56d7cfafe9&feed_id=18062&format=xml
+*/
 func main() {
 	//init parsers
 	nike := nikeParser.New(&nikeParser.Config{

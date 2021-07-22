@@ -17,23 +17,28 @@ func New(c *Config) *pr {
 		filepath: "./static/shops/" + c.SaveAs + ".xml",
 
 		//дополнительные данные
-		limit:  1000,
+		limit:  1500,
 		offset: 0,
 	}
 }
 
 func (p *pr) Parse() {
 	log.Printf("[%s] Started!\n", p.config.SaveAs)
+
+	//get vase url
 	baseURL, query := getBaseURL(p)
 
-	var offersBuffer nodeOffersList
+	var customOffersBuffer nodeCustomOffersList
+	var urlCache map[string]bool = map[string]bool{}
 	var processedOffers int
 
 	for {
+		//set query params
 		query.Set("limit", strconv.Itoa(p.limit))
 		query.Set("offset", strconv.Itoa(p.offset))
 		baseURL.RawQuery = query.Encode()
 
+		//request & read body
 		resp, err := http.Get(baseURL.String())
 		if err != nil {
 			log.Println(err)
@@ -47,6 +52,7 @@ func (p *pr) Parse() {
 			return
 		}
 
+		//parse body from xml
 		var catalog xmlYmlCatalog
 		if err = xml.Unmarshal(b, &catalog); err != nil {
 			log.Println(err)
@@ -57,10 +63,24 @@ func (p *pr) Parse() {
 			break
 		}
 
+		//offers filter & customize
 		for _, offer := range catalog.Shop.OffersList.Offers {
-			if offer.CategoryID == p.config.CategoryID {
-				offersBuffer.Offers = append(offersBuffer.Offers, offer)
-				log.Printf("[%s] Add (#%d) %s\n", p.config.SaveAs, len(offersBuffer.Offers), offer.Name)
+			if offer.CategoryID == p.config.CategoryID && !urlCache[offer.Url] {
+				customOffersBuffer.Items = append(customOffersBuffer.Items, nodeCustomOffer{
+					Title:        offer.Name,
+					Url:          offer.Url,
+					Firma:        "Nike",
+					Price:        offer.Price,
+					Color:        strings.TrimSpace(strings.Split(offer.Name, "-")[len(strings.Split(offer.Name, "-"))-1]),
+					Article:      strings.Split(strings.Split(offer.Picture, "/")[len(strings.Split(offer.Picture, "/"))-1], "?")[0],
+					Group:        1,
+					Sex:          1,
+					FreeShipping: 1,
+				})
+
+				urlCache[offer.Url] = true
+
+				log.Printf("[%s] Add (#%d) %s\n", p.config.SaveAs, len(customOffersBuffer.Items), offer.Name)
 			}
 		}
 
@@ -68,33 +88,32 @@ func (p *pr) Parse() {
 		processedOffers += len(catalog.Shop.OffersList.Offers)
 	}
 
-	var customOffersBuffer nodeCustomOffersList
+	// var customOffersBuffer nodeCustomOffersList
+	// for _, offer := range offersBuffer.Offers {
+	// 	customOffer := nodeCustomOffer{
+	// 		Title: offer.Name,
+	// 		Url:   offer.Url,
+	// 		Firma: "Nike",
+	// 		Price: offer.Price,
 
-	for _, offer := range offersBuffer.Offers {
+	// 		Color:   strings.TrimSpace(strings.Split(offer.Name, "-")[len(strings.Split(offer.Name, "-"))-1]),
+	// 		Article: strings.Split(strings.Split(offer.Picture, "/")[len(strings.Split(offer.Picture, "/"))-1], "?")[0],
 
-		customOffer := nodeCustomOffer{
-			Title: offer.Name,
-			Url:   offer.Url,
-			Firma: "Nike",
-			Price: offer.Price,
+	// 		Group:        1,
+	// 		Sex:          1,
+	// 		FreeShipping: 1,
+	// 	}
+	// 	customOffersBuffer.Items = append(customOffersBuffer.Items, customOffer)
+	// }
 
-			Color:   strings.TrimSpace(strings.Split(offer.Name, "-")[len(strings.Split(offer.Name, "-"))-1]),
-			Article: strings.Split(strings.Split(offer.Picture, "/")[len(strings.Split(offer.Picture, "/"))-1], "?")[0],
-
-			Group:        1,
-			Sex:          1,
-			FreeShipping: 1,
-		}
-
-		customOffersBuffer.Items = append(customOffersBuffer.Items, customOffer)
-	}
-
-	encodeOffers, err := xml.Marshal(customOffersBuffer)
+	//encode xml offers
+	marshalCustomOffers, err := xml.Marshal(customOffersBuffer)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
+	//open or create file with 777 right
 	file, err := os.OpenFile(p.filepath, os.O_CREATE|os.O_WRONLY, 0777)
 	if err != nil {
 		log.Println(err)
@@ -102,10 +121,11 @@ func (p *pr) Parse() {
 	}
 	defer file.Close()
 
+	//установка каретки в начала файла и запись
 	file.Truncate(0)
 	file.Seek(0, 0)
+	file.Write(marshalCustomOffers)
 
-	file.Write(encodeOffers)
 	log.Printf("[%s] Saved; Processed %d offers\n", p.config.SaveAs, processedOffers)
 }
 

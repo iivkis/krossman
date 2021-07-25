@@ -27,22 +27,3 @@ type xmlYmlCatalog struct {
 	XMLName xml.Name `xml:"yml_catalog"`
 	Shop    nodeShop `xml:"shop"`
 }
-
-//Custom XML Offers
-type nodeCustomOffer struct {
-	XMLName      xml.Name `json:"item"`
-	Title        string   `xml:"title"`
-	Url          string   `xml:"url"`
-	Article      string   `xml:"art"`
-	Firma        string   `xml:"firma"`
-	Color        string   `xml:"color"`
-	Price        float32  `xml:"price"`
-	Group        int      `xml:"group"`
-	FreeShipping int      `xml:"free_shipping"`
-	Sex          int      `xml:"sex"`
-}
-
-type nodeCustomOffersList struct {
-	XMLName xml.Name          `xml:"items"`
-	Items   []nodeCustomOffer `xml:"item"`
-}

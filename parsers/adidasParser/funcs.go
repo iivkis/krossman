@@ -1,4 +1,4 @@
-package nikeParser
+package adidasParser
 
 import (
 	"encoding/xml"
@@ -71,11 +71,13 @@ func (p *pr) save(xmlData interface{}) error {
 	return nil
 }
 
+
+
 func (p *pr) Parse() {
 	log.Printf("[%s] Started!\n", p.config.SaveAs)
 
 	var customOffersBuffer customxml.NodeCustomOffersList
-	var urlCache = map[string]bool{}
+	var articleCache = map[string]int{}
 	var processedOffers int
 
 	for {
@@ -98,26 +100,38 @@ func (p *pr) Parse() {
 
 		for _, offer := range catalog.Shop.OffersList.Offers {
 
-			article := strings.Split(strings.Split(offer.Picture, "/")[len(strings.Split(offer.Picture, "/"))-1], "?")[0]
-			article = string([]byte(article)[:10])
+			article := strings.Split(offer.Picture[0], "/")[len(strings.Split(offer.Picture[0], "/"))-1][:6]
 
-			if offer.CategoryID == p.config.CategoryID && !urlCache[offer.Url] {
+			if index, ok := articleCache[article]; ok {
+				customOffersBuffer.Items[index].SizesList.Sizes = append(customOffersBuffer.Items[index].SizesList.Sizes,
+					customxml.NodeCustomOfferSize{Size: offer.Params[4]},
+				)
+				continue
+			}
+
+			if offer.CategoryID == p.config.CategoryID {
 				customOffersBuffer.Items = append(customOffersBuffer.Items, customxml.NodeCustomOffer{
-					Title:   offer.Name,
-					Url:     offer.Url,
-					Firma:   "Nike",
-					Price:   offer.Price,
-					Color:   strings.TrimSpace(strings.Split(offer.Name, "-")[len(strings.Split(offer.Name, "-"))-1]),
-					Article: article,
+					Title:     offer.Name,
+					Url:       offer.Url,
+					Article:   article,
+					Firma:     "Adidas",
+					Color:     offer.Params[2],
+					Price:     offer.getOldprice(),
+					PriceFree: offer.getPrice(),
 					PhotosList: customxml.NodeCustomOfferPhotosList{Photos: []customxml.NodeCustomOfferPhoto{
-						{Main: 1, Url: offer.Picture},
+						{Main: 1, Url: offer.Picture[0]},
 					}},
+					SizesList: customxml.NodeCustomOfferSizesList{
+						Sizes: []customxml.NodeCustomOfferSize{
+							{Size: offer.Params[4]},
+						},
+					},
 					Group:        1,
-					Sex:          1,
 					FreeShipping: 1,
+					Sex:          1,
 				})
 
-				urlCache[offer.Url] = true
+				articleCache[article] = len(customOffersBuffer.Items) - 1
 
 				log.Printf("[%s] Add (#%d) %s\n", p.config.SaveAs, len(customOffersBuffer.Items), offer.Name)
 			}
@@ -125,7 +139,6 @@ func (p *pr) Parse() {
 
 		p.offset += p.limit
 		processedOffers += len(catalog.Shop.OffersList.Offers)
-
 	}
 
 	if err := p.save(customOffersBuffer); err != nil {
